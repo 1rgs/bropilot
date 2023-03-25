@@ -4,14 +4,15 @@ use crossterm::style::{
 use dialoguer::console::Term;
 use dialoguer::Input;
 use dialoguer::{theme::ColorfulTheme, Select};
-use dotenv::dotenv;
 use reqwest::Url;
 use std::env;
+use urlencoding::encode;
+#[macro_use]
+extern crate dotenv_codegen;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().ok();
-    let worker_url = env::var("WORKER_URL").expect("WORKER_URL not found");
+    let worker_url = dotenv!("WORKER_URL");
     let mut query = env::args()
         .skip(1)
         .collect::<Vec<String>>()
@@ -79,7 +80,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 query = input;
             }
             Some(2) | None => {
-                println!("Canceled.");
                 break;
             }
             _ => unreachable!(),
@@ -96,8 +96,8 @@ async fn fetch_gpt_response(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut url = Url::parse(worker_url)?;
     url.query_pairs_mut()
-        .append_pair("query", query)
-        .append_pair("context", context.unwrap_or(""));
+        .append_pair("query", &encode(query))
+        .append_pair("context", &encode(context.unwrap_or("")));
     let response = reqwest::get(url).await?;
     let result = response.text().await?;
     Ok(result)
@@ -105,6 +105,7 @@ async fn fetch_gpt_response(
 
 fn parse_gpt_response(response: String) -> (String, String) {
     let result: serde_json::Value = serde_json::from_str(&response).unwrap();
+
     let command = result["command"].as_str().unwrap_or("").to_string();
     let explanation = result["explanation"].as_str().unwrap_or("").to_string();
     (command, explanation)

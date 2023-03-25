@@ -26,7 +26,7 @@ async function handleRequest(request: Request): Promise<Response> {
 		return new Response("Bad Request", { status: 400 });
 	}
 
-	const prompt = constructGptPrompt(query, context);
+	const prompt = constructGptPrompt(decodeURIComponent(query), context && decodeURIComponent(context));
 	const openaiRequestBody = JSON.stringify({
 		model: "gpt-3.5-turbo",
 		messages: [{ role: "user", content: prompt }],
@@ -45,7 +45,9 @@ async function handleRequest(request: Request): Promise<Response> {
 		}
 	);
 
-	const openaiResult = await openaiResponse.json<OpenAIResult>();
+	const responseText = await openaiResponse.text();
+	console.log(responseText)
+	const openaiResult = JSON.parse(responseText) as OpenAIResult;
 	const message = openaiResult.choices[0].message.content;
 	const { command, explanation } = JSON.parse(message);
 
@@ -56,19 +58,18 @@ async function handleRequest(request: Request): Promise<Response> {
 
 function constructGptPrompt(query: string, context?: string): string {
 	const outputInstructions =
-		'Output valid JSON of the format {"command": "<command>", "explanation": "<explanation>"} where <command> is the rewritten command and <explanation> is a short explanation of the change.';
+		`Your response must be of type JSON with schema {"command": "<command>", "explanation": "<explanation>"} where <command> is the ${context ? "rewritten " : ""} command and <explanation> is a short explanation of the change.`;
 
 	if (context) {
-		return `Rewrite the following bash command to incorporate the requested change:
-  Command: ${context}
-  Feedback: ${query}
-  
-  ${outputInstructions}`;
+		return ` Command: ${context}
+		Feedback: ${query}
+		
+		Rewrite the above bash command to incorporate the requested change. ${outputInstructions}`;
 	} else {
 		return `
 		Write a bash command that does the following:
 		Intent: ${query}
-  
-  ${outputInstructions}`;
+		
+		${outputInstructions} `;
 	}
 }

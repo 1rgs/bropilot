@@ -1,4 +1,3 @@
 /target
-.env
 backend/.dev.vars
 backend/node_modules
